@@ -36,6 +36,10 @@
   (fn [config state]
     [config (assoc state :dia dia) (->SizedShape 0 (model/union))]))
 
+(defn outer-dia [dia]
+  (fn [config state]
+    [config (assoc state :dia (- dia (* 2 (:wall state)))) (->SizedShape 0 (model/union))]))
+
 (defn tube [height]
   (fn [config state]
     [config state (->SizedShape height (shape/tube (:dia state) height :wall (:wall state)))]))
@@ -67,7 +71,7 @@
 
 (defn cone [dia length & {:keys [outer]}]
   (fn [config state]
-    (let [new-dia (if outer (- dia (:wall state)) dia)]
+    (let [new-dia (if outer (- dia (* 2 (:wall state))) dia)]
       [config (assoc state :dia new-dia) (->SizedShape length (shape/tube-cone (:dia state) new-dia (:wall state) length))])))
 
 (defsegment dia-transition [new-dia & {:keys [run-in run-out length outer] :or {run-in 3 run-out 3 length 10}}]
