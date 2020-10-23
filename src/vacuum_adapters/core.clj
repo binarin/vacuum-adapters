@@ -2,6 +2,8 @@
   (:use [scad-clj.model])
   (:require [scad-clj.scad :as scad]))
 
+
+
 (def wall-thickness 2)
 (def hose-receptacle-dia 40)
 (def hose-receptacle-length 40)
@@ -9,32 +11,7 @@
 (def spacing 0.8)
 
 
-(defn tube
-  [dia wall height]
-  (difference
-   (cylinder (+ wall (/ dia 2)) height :center false)
-   (->>
-    (cylinder (/ dia 2) (+ 1 height) :center false)
-    (translate [0 0 -0.5]))))
-
-(defn tube-cone
-  [dia-1 dia-2 wall height]
-  (difference
-   (cylinder [(+ wall (/ dia-1 2)) (+ wall (/ dia-2 2))]
-             height :center false)
-   (->>
-    (cylinder [(/ dia-1 2) (/ dia-2 2)] (+ 1 height) :center false)
-    (translate [0 0 -0.5]))))
-
-(defn lock
-  [dia lock-size wall]
-  (union
-   (tube-cone dia (+ lock-size dia) wall-thickness lock-size)
-   (->>
-    (tube-cone (+ lock-size dia) dia wall-thickness lock-size)
-    (translate [0 0 lock-size]))))
-
-(def hose-receptacle (tube hose-receptacle-dia wall-thickness hose-receptacle-length))
+(def hose-receptacle (tube hose-receptacle-dia hose-receptacle-length :wall wall-thickness))
 (def hose-receptacle-lock (lock hose-receptacle-dia lock-size wall-thickness))
 
 (def hose-part (union
@@ -54,13 +31,9 @@
 (def intake-far-dia 50)
 (def intake-near-dia 50)
 
-(defn up [z & block]
-  (apply translate [0 0 z] block))
-
-
 (def intake-part (union
                   (->>
-                   (tube intake-overlap-inner-dia wall-thickness pre-lock-overlap)
+                   (tube intake-overlap-inner-dia pre-lock-overlap :wall wall-thickness)
                    (translate [0 0 (- hose-receptacle-length pre-lock-overlap)]))
                   (->>
                    (lock intake-overlap-inner-dia lock-size wall-thickness)
@@ -85,6 +58,7 @@
   (call-inline "he_rotate" [90 0 0]
                (call-inline "he_translate" [(/ hose-receptacle-dia 2) 0 0]
                             (call-inline "he_circle" "$fn = 20" thread-profile-dia))))
+
 (def thread (up thread-offset (mirror [90 0 0] (call-module "helix_extrude" {:shape thread-shape :pitch thread-pitch :rotations thread-rotations}))))
 
 (def assembly (union
@@ -108,6 +82,10 @@
 ;; - fixed adapter to Metabo
 ;; - fixed adapter to cyclone
 ;; - rotating adapter to cyclone
+;; (defn fixed-hose-to-metabo []
+;;   (let []
+;;     (union hose-receptacle-with-thread diameter-align meta))
+;;   )
 
 
 
