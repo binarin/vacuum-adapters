@@ -1,12 +1,9 @@
 (ns vacuum-adapters.shape
-  (:use [scad-clj.model])
+  (:use [scad-clj.model :exclude [import use]])
   (:require [scad-clj.scad :as scad]))
 
-
-(def *wall-thickness* 2)
-
 (defn tube
-  [dia height & {:keys [wall] :or {wall *wall-thickness*}}]
+  [dia height & {:keys [wall]}]
   (difference
    (cylinder (+ wall (/ dia 2)) height :center false)
    (->>

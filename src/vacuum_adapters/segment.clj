@@ -7,7 +7,7 @@
 (defrecord State [wall dia])
 (defrecord RenderedSegment [height shape extra-parts])
 
-(def *empty-rendered-segment* (->RenderedSegment 0 nil []))
+(def empty-rendered-segment (->RenderedSegment 0 nil []))
 
 
 (defn stack-rendered-segments [a b]
@@ -43,18 +43,18 @@
 (defn wall-thickness [wall]
   "Empty segment that sets wall thickness to a given value."
   (fn [config state]
-    [config (assoc state :wall wall) *empty-rendered-segment*]))
+    [config (assoc state :wall wall) empty-rendered-segment]))
 
 (defn inner-dia [dia]
   "Empty segment that sets inner diameter to a given value."
   (fn [config state]
-    [config (assoc state :dia dia) *empty-rendered-segment*]))
+    [config (assoc state :dia dia) empty-rendered-segment]))
 
 (defn outer-dia [dia]
   "Empty segment that sets outer diameter to a given value.
   This just takes current wall thickness into account."
   (fn [config state]
-    [config (assoc state :dia (- dia (* 2 (:wall state)))) *empty-rendered-segment*]))
+    [config (assoc state :dia (- dia (* 2 (:wall state)))) empty-rendered-segment]))
 
 (defn tube [length]
   "A tube segment with a given length, using current diameter and wall thickness."
@@ -63,10 +63,7 @@
 
 (defn hose-thread-zero-length [& {:keys [pitch rotations offset profile-dia]}]
   (fn [config state]
-    (let [profile (->>
-                   (model/call-inline "he_circle" "$fn = 20" profile-dia)
-                   (model/call-inline "he_translate" [(/ (:dia state) 2) 0 0])
-                   (model/call-inline "he_rotate" [90 0 0]))]
+    (let [profile (String/format nil "he_rotate([90,0,0], he_translate([%f,0,0], he_circle($fn = 20, %f)))" (to-array [(/ (:dia state) 2.0) (double profile-dia)]) )]
       [config state (->RenderedSegment 0 (shape/up offset (model/mirror [90 0 0] (model/call-module "helix_extrude" {:shape profile :pitch pitch :rotations rotations}))) [])])))
 
 (defsegment tube-with-thread [& {:keys [pitch rotations profile-dia]}]
@@ -109,60 +106,42 @@
   `(fn [~'config ~'state]
      (if ~test
        (run-segments ~'config ~'state [~@body])
-       [~'config ~'state ~'*empty-rendered-segment*])))
+       [~'config ~'state ~'empty-rendered-segment])))
 
 
-(defsegment dia-transition [new-dia & {:keys [run-in run-out length outer] :or {run-in 10 run-out 3}}]
+(defsegment dia-transition [new-dia & {:keys [run-in run-out length outer] :or {run-in 0 run-out 0}}]
   (segment-when (> run-in 0)
    (tube run-in))
   (cone new-dia (or length (Math/abs (- new-dia (:dia state)))) :outer outer)
   (segment-when (> run-out 0)
    (tube run-out)))
 
-(defn render-segments [base-name segments & {:keys [fn] :or {fn 128}}]
+(defn render-segments [base-name segments & {:keys [fn extra-spacing debug-cube-size] :or {fn 128 extra-spacing 100 debug-cube-size 40}}]
   (let [[config state rendered] (run-segments segments)]
     (spit (format "%s.scad" base-name)
           (scad/write-scad [(model/use "helix_extrude.scad")
                             (model/fn! fn)
-                            ;; (:shape rendered)
-                            ;; (model/difference
-                            ;;  (:shape rendered)
-                            ;;  (shape/down 10 (model/cube 40 40 1000 :center false)))
-
+                            (:shape rendered)
                             ]))
+    (spit (format "%s-debug.scad" base-name)
+          (let [cut-cube (shape/down 10 (model/cube debug-cube-size debug-cube-size (* 3 (:height rendered)) :center false))]
+            (scad/write-scad [(model/use "helix_extrude.scad")
+                              (model/fn! fn)
+                              (model/difference
+                               (:shape rendered)
+                               cut-cube)
+                              (map-indexed
+                               #(model/translate [(* extra-spacing (+ 1 %1)) 0 0] (model/difference %2 cut-cube))
+                               (:extra-parts rendered))
+                             ])))
     (doseq [[idx shape] (map-indexed vector (:extra-parts rendered))]
       (spit (format "%s-%d.scad" base-name idx)
             (scad/write-scad [(model/use "helix_extrude.scad")
                               (model/fn! fn)
                               shape])))))
 
-(defsegment my-hose-interface []
-  "Starting segment to screw in a vacuum hose that I have around in my shop."
-  (wall-thickness 2)
-  (inner-dia 40)
-  (tube 2)
-  (tube-with-thread :profile-dia 4 :pitch 5.8 :rotations 4)
-  (tube 5))
-
-(defsegment cyclone-port []
-  "Ending segment that goes into my cyclone"
-  (dia-transition 50 :outer true :run-in 0 :run-out 0)
-  (tube 35))
 
 (defsegment lock-with-sealing-ring []
   "A reasonable rotating connector with additional seal ring."
   (rotating-lock :size 15 :overlap-length 25 :spacing 1.0 :extra-overlap-spacing 1))
 
-(render-segments
- "rotating-cyclone-adapter"
- [(my-hose-interface)
-  (lock-with-sealing-ring)
-  (cyclone-port)])
-
-
-
-;; (go
-;;   (my-hose-interface)
-;;   (rotating-lock lock-size)
-;;   (outer-dia-transition intake-near-dia)
-;;   (outer-cone intake-far-dia))

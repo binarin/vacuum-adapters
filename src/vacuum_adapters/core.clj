@@ -1,97 +1,49 @@
 (ns vacuum-adapters.core
-  (:use [scad-clj.model])
-  (:require [scad-clj.scad :as scad]))
+  (:use [vacuum-adapters.segment]))
 
+(defsegment my-hose-interface []
+  "Starting segment to screw in a vacuum hose that I have around in my shop."
+  (wall-thickness 2)
+  (inner-dia 40)
+  (tube 2)
+  (tube-with-thread :profile-dia 4 :pitch 5.8 :rotations 4)
+  (tube 5))
 
+(defsegment cyclone-port []
+  "Ending segment that goes into my cyclone"
+  (dia-transition 50 :outer true)
+  (tube 35))
 
-(def wall-thickness 2)
-(def hose-receptacle-dia 40)
-(def hose-receptacle-length 40)
-(def lock-size 15)
-(def spacing 0.8)
+(defsegment metabo-port []
+  "End segment for in/out ports on my metabo shopvac"
+  (dia-transition 57.9 :outer true)
+  (cone 57.6 25 :outer true))
 
+(defsegment tool-connector []
+  "End segment for standard 35mm tools connection"
+  (dia-transition 35.5 :outer true)
+  (cone 34.5 40 :outer true))
 
-(def hose-receptacle (tube hose-receptacle-dia hose-receptacle-length :wall wall-thickness))
-(def hose-receptacle-lock (lock hose-receptacle-dia lock-size wall-thickness))
+(defn -main []
+  (render-segments
+   "cyclone-adapter-rotating"
+   [(my-hose-interface)
+    (lock-with-sealing-ring)
+    (cyclone-port)])
 
-(def hose-part (union
-                hose-receptacle
-               (->>
-                hose-receptacle-lock
-                (translate [0 0 hose-receptacle-length]))
-               ))
+  (render-segments
+   "metabo-adapter-fixed"
+   [(my-hose-interface)
+    (metabo-port)])
 
-(def pre-lock-overlap 30)
+  (render-segments
+   "cyclone-adapter-fixed"
+   [(my-hose-interface)
+    (cyclone-port)])
 
-(def intake-overlap-inner-dia (+ hose-receptacle-dia (* 2 (+ wall-thickness spacing)) ))
-
-
-(def intake-length 35)
-(def intake-to-lock-transition-length 5)
-(def intake-far-dia 50)
-(def intake-near-dia 50)
-
-(def intake-part (union
-                  (->>
-                   (tube intake-overlap-inner-dia pre-lock-overlap :wall wall-thickness)
-                   (translate [0 0 (- hose-receptacle-length pre-lock-overlap)]))
-                  (->>
-                   (lock intake-overlap-inner-dia lock-size wall-thickness)
-                   (translate [0 0 hose-receptacle-length])
-                   )
-                  (->>
-                   (tube-cone intake-overlap-inner-dia
-                              intake-near-dia
-                              wall-thickness
-                              intake-to-lock-transition-length)
-                   (up (+ hose-receptacle-length (* 2 lock-size))))
-                  (->>
-                   (tube-cone intake-near-dia intake-far-dia wall-thickness intake-length)
-                   (up (+ hose-receptacle-length (* 2 lock-size) intake-to-lock-transition-length)))
-                  ))
-
-(def thread-profile-dia 4)
-(def thread-offset 5)
-(def thread-pitch 5.8)
-(def thread-rotations 4)
-(def thread-shape
-  (call-inline "he_rotate" [90 0 0]
-               (call-inline "he_translate" [(/ hose-receptacle-dia 2) 0 0]
-                            (call-inline "he_circle" "$fn = 20" thread-profile-dia))))
-
-(def thread (up thread-offset (mirror [90 0 0] (call-module "helix_extrude" {:shape thread-shape :pitch thread-pitch :rotations thread-rotations}))))
-
-(def assembly (union
-               hose-part
-               intake-part
-               thread))
-
-(def test-fit (union
-               (difference
-                hose-receptacle
-                (->>
-                 (cube (+ (* 3 wall-thickness) hose-receptacle-dia) (+ (* 3 wall-thickness) hose-receptacle-dia) hose-receptacle-length :center true)
-                 (up (+ (/ hose-receptacle-length 2) thread-offset thread-profile-dia (* thread-pitch thread-rotations)))))
-               thread))
-
-;; hose receptacle + rotating interface + diameter align + connector
-;; hose receptacle + diameter align + connector
-;; connector 1 + diameter align + connector 2 + inclined long hose receptacle - (insides of connectors and aligner)
-
-;; what I need:
-;; - fixed adapter to Metabo
-;; - fixed adapter to cyclone
-;; - rotating adapter to cyclone
-;; (defn fixed-hose-to-metabo []
-;;   (let []
-;;     (union hose-receptacle-with-thread diameter-align meta))
-;;   )
-
-
-
-
-(spit "demo.scad" (scad/write-scad [(use "helix_extrude.scad")
-                                    (fn! 128)
-                                    assembly
-                                    ;; (translate [100 0 0] test-fit)
-                                    ]))
+  (render-segments
+   "tool-connector-rotating"
+   [(my-hose-interface)
+    (lock-with-sealing-ring)
+    (tool-connector)
+    ]))
