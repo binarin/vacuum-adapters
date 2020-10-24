@@ -7,16 +7,22 @@
 (defrecord State [wall dia])
 (defrecord RenderedSegment [height shape extra-parts])
 
+(def *empty-rendered-segment* (->RenderedSegment 0 nil []))
+
+
+(defn stack-rendered-segments [a b]
+  (let [new-height (+ (:height a) (:height b))
+        extra-parts (concat (:extra-parts a) (:extra-parts b))]
+    (cond
+      (nil? (:shape a)) (->RenderedSegment new-height (shape/up (:height a) (:shape b)) extra-parts)
+      (nil? (:shape b)) (->RenderedSegment new-height (:shape a) extra-parts)
+      :else (->RenderedSegment new-height (model/union (:shape a) (shape/up (:height a) (:shape b))) extra-parts))))
+
 (defn combine-segments [a b]
   (fn [config state]
     (let [[config-a state-a seg-a] (a config state)
-          [config-b state-b seg-b] (b config-a state-a)
-          seg (->RenderedSegment
-               (+ (:height seg-a) (:height seg-b))
-               (model/union (:shape seg-a)
-                            (shape/up (:height seg-a) (:shape seg-b)))
-               (concat (:extra-parts seg-a) (:extra-parts seg-b)))]
-      [config-b state-b seg])))
+          [config-b state-b seg-b] (b config-a state-a)]
+      [config-b state-b (stack-rendered-segments seg-a seg-b)])))
 
 (defn run-segments
   ([segments]
@@ -27,20 +33,20 @@
 
 (defmacro defsegment [name args & body]
   `(defn ~name [~@args]
-     (fn [config# state#]
-       (run-segments config# state# [~@body]))))
+     (fn [~'config ~'state]
+       (run-segments ~'config ~'state [~@body]))))
 
 (defn wall-thickness [wall]
   (fn [config state]
-    [config (assoc state :wall wall) (->RenderedSegment 0 (model/union) [])]))
+    [config (assoc state :wall wall) *empty-rendered-segment*]))
 
 (defn inner-dia [dia]
   (fn [config state]
-    [config (assoc state :dia dia) (->RenderedSegment 0 (model/union) [])]))
+    [config (assoc state :dia dia) *empty-rendered-segment*]))
 
 (defn outer-dia [dia]
   (fn [config state]
-    [config (assoc state :dia (- dia (* 2 (:wall state)))) (->RenderedSegment 0 (model/union) [])]))
+    [config (assoc state :dia (- dia (* 2 (:wall state)))) *empty-rendered-segment*]))
 
 (defn tube [height]
   (fn [config state]
@@ -82,10 +88,20 @@
     (let [new-dia (if outer (- dia (* 2 (:wall state))) dia)]
       [config (assoc state :dia new-dia) (->RenderedSegment length (shape/tube-cone (:dia state) new-dia (:wall state) length) [])])))
 
-(defsegment dia-transition [new-dia & {:keys [run-in run-out length outer] :or {run-in 3 run-out 3 length 10}}]
-  (tube run-in)
-  (cone new-dia length :outer outer)
-  (tube run-out))
+(defmacro segment-when [test & body]
+  `(fn [~'config ~'state]
+     (if ~test
+       (run-segments ~'config ~'state [~@body])
+       [~'config ~'state ~'*empty-rendered-segment*])))
+
+
+(defsegment dia-transition [new-dia & {:keys [run-in run-out length outer] :or {run-in 10 run-out 3}}]
+  (segment-when (> run-in 0)
+   (tube run-in))
+  (cone new-dia (or length (Math/abs (- new-dia (:dia state)))) :outer outer)
+  (segment-when (> run-out 0)
+   (tube run-out)))
+
 
 (defn render-segments [base-name segments & {:keys [fn] :or {fn 128}}]
   (let [[config state rendered] (run-segments segments)]
@@ -109,7 +125,7 @@
 
 (render-segments "demo" [(my-hose-interface)
                               (rotating-lock :size 15 :overlap-length 20 :spacing 1.0 :extra-overlap-spacing 1)
-                              (dia-transition 50 :outer true :length 3 :run-in 1 :run-out 0)
+                              (dia-transition 50 :outer true :run-in 0 :run-out 0)
                               (tube 35)])
 
 
