@@ -32,27 +32,36 @@
    ((reduce combine-segments segments) config state)))
 
 (defmacro defsegment [name args & body]
-  `(defn ~name [~@args]
-     (fn [~'config ~'state]
-       (run-segments ~'config ~'state [~@body]))))
+  (let [has-doc (string? (first body))
+        maybe-doctring (if has-doc [(first body)] [])
+        body-without-docstring (if has-doc (rest body) body)]
+    `(defn ~name [~@args]
+       ~@maybe-doctring
+       (fn [~'config ~'state]
+         (run-segments ~'config ~'state [~@body-without-docstring])))))
 
 (defn wall-thickness [wall]
+  "Empty segment that sets wall thickness to a given value."
   (fn [config state]
     [config (assoc state :wall wall) *empty-rendered-segment*]))
 
 (defn inner-dia [dia]
+  "Empty segment that sets inner diameter to a given value."
   (fn [config state]
     [config (assoc state :dia dia) *empty-rendered-segment*]))
 
 (defn outer-dia [dia]
+  "Empty segment that sets outer diameter to a given value.
+  This just takes current wall thickness into account."
   (fn [config state]
     [config (assoc state :dia (- dia (* 2 (:wall state)))) *empty-rendered-segment*]))
 
-(defn tube [height]
+(defn tube [length]
+  "A tube segment with a given length, using current diameter and wall thickness."
   (fn [config state]
-    [config state (->RenderedSegment height (shape/tube (:dia state) height :wall (:wall state)) [])]))
+    [config state (->RenderedSegment length (shape/tube (:dia state) length :wall (:wall state)) [])]))
 
-(defn hose-thread [& {:keys [pitch rotations offset profile-dia]}]
+(defn hose-thread-zero-length [& {:keys [pitch rotations offset profile-dia]}]
   (fn [config state]
     (let [profile (->>
                    (model/call-inline "he_circle" "$fn = 20" profile-dia)
@@ -60,7 +69,13 @@
                    (model/call-inline "he_rotate" [90 0 0]))]
       [config state (->RenderedSegment 0 (shape/up offset (model/mirror [90 0 0] (model/call-module "helix_extrude" {:shape profile :pitch pitch :rotations rotations}))) [])])))
 
-(defn rotating-lock [& {:keys [size overlap-length spacing extra-overlap-spacing extra-overlap-seal-gap] :or {size 15 overlap-length 15 spacing 1.0 extra-overlap-spacing 1 extra-overlap-seal-gap 0.2}}]
+(defsegment tube-with-thread [& {:keys [pitch rotations profile-dia]}]
+  "A tube segment with internal left thread.
+  Length of the tube is just enough to cover a thread with a given pitch and rotations number"
+  (hose-thread-zero-length :pitch pitch :rotations rotations :offset (/ profile-dia 2) :profile-dia profile-dia)
+  (tube (+ profile-dia (* pitch rotations))))
+
+(defn rotating-lock [& {:keys [size overlap-length spacing extra-overlap-spacing extra-overlap-seal-gap] :or {size 15 overlap-length 15 spacing 1.0 extra-overlap-spacing 1 extra-overlap-seal-gap 0.15}}]
   (fn [config state]
     (let [inner-dia (:dia state)
           wall (:wall state)
@@ -69,7 +84,9 @@
           base-overlap-shape (shape/tube overlap-dia-with-extra overlap-length :wall wall)
           overlap-shape (if (> extra-overlap-spacing 0)
                           (model/union
-                           (shape/down (+ overlap-length extra-overlap-spacing) base-overlap-shape)
+                           (shape/up
+                            (* 2 extra-overlap-spacing)
+                            (shape/down overlap-length base-overlap-shape))
                            (shape/down
                             extra-overlap-spacing
                             (shape/tube-cone overlap-dia-with-extra overlap-dia wall extra-overlap-spacing)))
@@ -102,13 +119,15 @@
   (segment-when (> run-out 0)
    (tube run-out)))
 
-
 (defn render-segments [base-name segments & {:keys [fn] :or {fn 128}}]
   (let [[config state rendered] (run-segments segments)]
     (spit (format "%s.scad" base-name)
           (scad/write-scad [(model/use "helix_extrude.scad")
                             (model/fn! fn)
-                            (:shape rendered)
+                            ;; (:shape rendered)
+                            ;; (model/difference
+                            ;;  (:shape rendered)
+                            ;;  (shape/down 10 (model/cube 40 40 1000 :center false)))
 
                             ]))
     (doseq [[idx shape] (map-indexed vector (:extra-parts rendered))]
@@ -118,15 +137,27 @@
                               shape])))))
 
 (defsegment my-hose-interface []
+  "Starting segment to screw in a vacuum hose that I have around in my shop."
   (wall-thickness 2)
   (inner-dia 40)
-  (hose-thread :profile-dia 4 :pitch 5.8 :rotations 4 :offset 5)
-  (tube 30))
+  (tube 2)
+  (tube-with-thread :profile-dia 4 :pitch 5.8 :rotations 4)
+  (tube 5))
 
-(render-segments "demo" [(my-hose-interface)
-                              (rotating-lock :size 15 :overlap-length 20 :spacing 1.0 :extra-overlap-spacing 1)
-                              (dia-transition 50 :outer true :run-in 0 :run-out 0)
-                              (tube 35)])
+(defsegment cyclone-port []
+  "Ending segment that goes into my cyclone"
+  (dia-transition 50 :outer true :run-in 0 :run-out 0)
+  (tube 35))
+
+(defsegment lock-with-sealing-ring []
+  "A reasonable rotating connector with additional seal ring."
+  (rotating-lock :size 15 :overlap-length 25 :spacing 1.0 :extra-overlap-spacing 1))
+
+(render-segments
+ "rotating-cyclone-adapter"
+ [(my-hose-interface)
+  (lock-with-sealing-ring)
+  (cyclone-port)])
 
 
 
