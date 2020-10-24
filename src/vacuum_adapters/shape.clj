@@ -16,11 +16,11 @@
 (defn tube-cone
   [dia-1 dia-2 wall height]
   (difference
-   (cylinder [(+ wall (/ dia-1 2)) (+ wall (/ dia-2 2))]
+   (cylinder [(+ wall (/ dia-1 2.0)) (+ wall (/ dia-2 2.0))]
              height :center false)
    (->>
-    (cylinder [(/ dia-1 2) (/ dia-2 2)] (+ 1 height) :center false)
-    (translate [0 0 -0.5]))))
+    (cylinder [(/ dia-1 2.0) (/ dia-2 2.0)] (+ 0.001 height) :center false)
+    (translate [0 0 -0.0005]))))
 
 (defn lock
   [dia lock-size wall]
