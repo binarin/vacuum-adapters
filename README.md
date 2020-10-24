@@ -1,22 +1,25 @@
 # vacuum-adapters
 
-A Clojure library designed to ... well, that part is up to you.
+Workshop-vacuum-extraction-as-code (WVEaC). Generates 3D-printable
+adapters to connect different things to a shop-vac. Like [Fixed
+adapter for connecting 50 mm cyclone](./fixed-adapter.png) or
+[Rotating adapter for tools](./rotating-adapter-example.png).
 
 ## Usage
 
-FIXME
+You'll need to have `lein` and `OpenSCAD` installed.
 
-## License
+Edit [configuration file](./src/vacuum_adapter/core.clj) and run `lein
+run`. This will produce a bunch of OpenSCAD files.
 
-Copyright © 2020 FIXME
+For every defined connector you'll see the following files:
+- Files with number in name (like `-0`) - those are additional parts to be printed separately (e.g. sealing rings).
+- File with `-debug` in name contain all parts arranged in a line, with a cross-section cut out (like example above).
+- File without any suffix is a primary part of a connector, to be printed in a single piece.
 
-This program and the accompanying materials are made available under the
-terms of the Eclipse Public License 2.0 which is available at
-http://www.eclipse.org/legal/epl-2.0.
 
-This Source Code may also be made available under the following Secondary
-Licenses when the conditions for such availability set forth in the Eclipse
-Public License, v. 2.0 are satisfied: GNU General Public License as published by
-the Free Software Foundation, either version 2 of the License, or (at your
-option) any later version, with the GNU Classpath Exception which is available
-at https://www.gnu.org/software/classpath/license.html.
+
+
+
+
+

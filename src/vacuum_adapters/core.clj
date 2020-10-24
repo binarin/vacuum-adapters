@@ -26,6 +26,10 @@
 
 (defn -main []
   (render-segments
+   "thread-test"
+   [(my-hose-interface)])
+
+  (render-segments
    "cyclone-adapter-rotating"
    [(my-hose-interface)
     (lock-with-sealing-ring)
