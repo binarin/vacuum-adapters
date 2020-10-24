@@ -2,6 +2,7 @@
 
 Workshop-vacuum-extraction-as-code (WVEaC). Generates 3D-printable
 adapters to connect different things to a shop-vac. Like this one:
+
 ![Rotating adapter for tools](./rotating-adapter-example.png).
 
 ## Usage
