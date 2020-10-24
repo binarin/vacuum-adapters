@@ -9,7 +9,7 @@ adapters to connect different things to a shop-vac. Like this one:
 
 You'll need to have `lein` and `OpenSCAD` installed.
 
-Edit [configuration file](./src/vacuum_adapter/core.clj) and run `lein
+Edit [configuration file](./src/vacuum_adapters/core.clj) and run `lein
 run`. This will produce a bunch of OpenSCAD files.
 
 For every defined connector you'll see the following files:
