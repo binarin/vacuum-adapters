@@ -1,9 +1,9 @@
 # vacuum-adapters
 
 Workshop-vacuum-extraction-as-code (WVEaC). Generates 3D-printable
-adapters to connect different things to a shop-vac. Like [Fixed
+adapters to connect different things to a shop-vac. Like ![Fixed
 adapter for connecting 50 mm cyclone](./fixed-adapter.png) or
-[Rotating adapter for tools](./rotating-adapter-example.png).
+![Rotating adapter for tools](./rotating-adapter-example.png).
 
 ## Usage
 
